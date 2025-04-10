@@ -28,9 +28,11 @@ The system provides three complementary approaches to make an attempt at quantum
 - **Production-Ready Error Handling**: Graceful recovery from all I/O operations
 - **Format Flexibility**: Outputs binary or text formats for easy integration
 
-## Technical Implementation
+---
 
-### Installation
+# Technical Implementation
+
+## Easy Installation
 
 ```bash
 # Clone repository
@@ -44,7 +46,7 @@ sudo apt-get install libopencv-dev libasound2-dev
 cargo build --release
 ```
 
-### Usage Examples
+#### Usage Examples
 
 ```bash
 # Generate 10,000 random bits using webcam quantum noise
@@ -56,6 +58,281 @@ cargo build --release
 # Generate 4,096 bits from Arduino-based hardware QRNG
 ./QuantumRNG serial --port /dev/ttyUSB0 --num-bits 4096 --output-file hardware_qrng.bin
 ```
+
+## Full installation
+<details closed>
+<summary>Click me to show!</summary>
+<br>
+  
+## 1. Environmental Prerequisites
+
+### 1.1. System Dependencies
+
+```bash
+# Debian/Ubuntu-based systems
+sudo apt update
+sudo apt install -y build-essential pkg-config libssl-dev \
+    libopencv-dev libclang-dev cmake \
+    libasound2-dev libudev-dev \
+    arduino arduino-core arduino-mk
+
+# Fedora/RHEL-based systems
+sudo dnf install -y gcc gcc-c++ make pkg-config openssl-devel \
+    opencv-devel clang-devel cmake \
+    alsa-lib-devel systemd-devel \
+    arduino arduino-devel
+    
+# Arch-based systems
+sudo pacman -S base-devel pkg-config openssl \
+    opencv clang cmake \
+    alsa-lib systemd-libs \
+    arduino
+```
+
+### 1.2. Rust Toolchain Installation
+
+```bash
+# Install Rust using rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Ensure stable toolchain
+rustup default stable
+
+# Install additional components
+rustup component add clippy rustfmt
+```
+
+## 2. Hardware Configuration
+
+### 2.1. Optical QRNG Setup (Webcam-based)
+
+1. **Connect a USB webcam** to your system
+2. **Create light-isolated environment** for optimal quantum noise:
+   ```
+   - Enclose webcam in opaque container (e.g., small cardboard box)
+   - Apply black electrical tape over lens leaving tiny aperture (0.5mm)
+   - Alternatively: use lens cap with single pinhole
+   ```
+3. **Verify hardware detection**:
+   ```bash
+   # List detected video devices
+   v4l2-ctl --list-devices
+   
+   # Test video capture (should show static/noise)
+   ffplay -f video4linux2 -input_format mjpeg -i /dev/video0 -video_size 160x120
+   ```
+
+### 2.2. Audio QRNG Setup (Microphone-based)
+
+1. **Connect microphone** (internal or external) 
+2. **Create RF-isolated environment** (optional, for higher quality randomness):
+   ```
+   - Use shielded microphone if available
+   - Place in Faraday cage (metal mesh box/aluminum foil enclosure)
+   - Keep away from strong RF sources (Wi-Fi routers, etc.)
+   ```
+3. **Verify hardware detection**:
+   ```bash
+   # List audio devices
+   arecord -l
+   
+   # Test audio capture (should capture ambient noise)
+   arecord -d 5 -f S16_LE -r 44100 -c 1 test.wav && aplay test.wav
+   ```
+
+### 2.3. Hardware QRNG Setup (Arduino-based)
+
+1. **Circuit assembly**:
+   ```
+   Components:
+   - Arduino Uno/Nano/Pro Mini
+   - 1× Photodiode or reverse-biased LED (preferred: BPW34)
+   - 1× 1MΩ resistor
+   - 1× 10KΩ resistor (optional, for stability)
+   - Breadboard and jumper wires
+   
+   Connections:
+   +5V ── [1MΩ resistor] ── +── [Photodiode] ── GND
+                             │
+                      Analog Pin A0
+   ```
+
+2. **Upload firmware**:
+   ```bash
+   # Navigate to Arduino sketch directory
+   cd QuantumRNG/arduino
+   
+   # Compile and upload (adjust port as needed)
+   arduino-cli compile --fqbn arduino:avr:uno quantum_rng
+   arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno quantum_rng
+   
+   # Alternative: Using Arduino IDE
+   # 1. Open arduino/quantum_rng.ino in Arduino IDE
+   # 2. Select board type (Tools > Board > Arduino Uno)
+   # 3. Select port (Tools > Port > /dev/ttyACM0)
+   # 4. Click Upload button
+   ```
+
+3. **Verify communication**:
+   ```bash
+   # Test serial output (should show stream of 0s and 1s)
+   screen /dev/ttyACM0 9600
+   # Press Ctrl+A then K to exit
+   ```
+
+## 3. Build Process
+
+### 3.1. Core Application Compilation
+
+```bash
+# Clone repository (if not done already)
+git clone https://github.com/CPScript/QuantumRNG.git
+cd QuantumRNG
+
+# Build in development mode
+cargo build
+
+# Build optimized release binary
+cargo build --release
+
+# Run tests
+cargo test -- --nocapture
+```
+
+### 3.2. Compile-time Configuration (Optional)
+
+For custom feature configurations, modify Cargo.toml:
+
+```toml
+# Add these lines under [features] section
+[features]
+default = ["webcam", "audio"]
+webcam = ["opencv"]
+audio = ["cpal"]
+hardware = ["serialport"]
+all = ["webcam", "audio", "hardware"]
+```
+
+Then build with selected features:
+
+```bash
+# Build with only webcam support
+cargo build --release --no-default-features --features webcam
+
+# Build with all features
+cargo build --release --features all
+```
+
+## 4. Testing Protocol
+
+### 4.1. Functional Validation
+
+```bash
+# 1. Optical QRNG Test
+./target/release/QuantumRNG webcam --num-bits 1024 --output-file optical_test.bin
+
+# 2. Audio QRNG Test
+./target/release/QuantumRNG audio --num-bits 1024 --output-file audio_test.bin
+
+# 3. Hardware QRNG Test (adjust port as needed)
+./target/release/QuantumRNG serial --port /dev/ttyACM0 --num-bits 1024 --output-file hardware_test.bin
+```
+
+### 4.2. Quality Assurance Tests
+
+```bash
+# Generate larger sample for statistical testing
+./target/release/QuantumRNG webcam --num-bits 100000 --apply-debiasing --apply-hashing --output-file statistical_test.bin
+
+# Install randomness test suite (if not already installed)
+sudo apt install dieharder rng-tools
+
+# Basic entropy assessment
+rngtest -c 1000 < statistical_test.bin
+
+# Comprehensive statistical analysis
+dieharder -a -f statistical_test.bin -g 201
+```
+
+### 4.3. Performance Benchmarking
+
+```bash
+# Time generation of 1 million bits
+time ./target/release/QuantumRNG audio --num-bits 1000000 --output-file benchmark.bin
+
+# Run with Rust benchmark harness (requires nightly)
+rustup run nightly cargo bench
+```
+
+## 5. Troubleshooting Framework
+
+### 5.1. Diagnostic Procedures
+
+| Issue | Diagnosis Command | Solution |
+|-------|-------------------|----------|
+| Webcam access denied | `ls -la /dev/video*` | `sudo chmod a+rw /dev/video0` |
+| Arduino not detected | `ls -la /dev/tty*` | `sudo usermod -a -G dialout $USER` |
+| OpenCV library not found | `ldd ./target/debug/QuantumRNG` | `sudo apt install libopencv-dev` |
+| Audio device busy | `fuser -v /dev/snd/*` | Kill competing process |
+
+### 5.2. Hardware Signal Analysis
+
+For validation of quantum noise quality:
+
+```bash
+# Install signal processing tools
+sudo apt install gnuplot sox
+
+# Record raw analog values from Arduino (modify quantum_rng.ino first)
+# Change: Serial.println(randomBit); → Serial.println(analogValue);
+# Then capture and visualize:
+stty -F /dev/ttyACM0 9600 raw
+cat /dev/ttyACM0 > arduino_values.txt &
+sleep 10
+kill $!
+
+# Plot noise distribution
+gnuplot -e "set term png; set output 'noise_distribution.png'; \
+  plot 'arduino_values.txt' using 1 with histeps title 'Noise Distribution'"
+```
+
+## 6. Advanced Configuration
+
+### 6.1. Entropy Source Hybridization
+
+For critical applications, combining multiple entropy sources:
+
+```bash
+# Generate bits from all sources
+./target/release/QuantumRNG webcam --num-bits 1024 --output-file source1.bin
+./target/release/QuantumRNG audio --num-bits 1024 --output-file source2.bin 
+./target/release/QuantumRNG serial --port /dev/ttyACM0 --num-bits 1024 --output-file source3.bin
+
+# Create hybrid entropy pool (requires xxd)
+xxd -p source1.bin | tr -d '\n' > pool.hex
+xxd -p source2.bin | tr -d '\n' | python3 -c "
+import sys
+a=sys.stdin.read()
+b=open('pool.hex').read()
+min_len = min(len(a),len(b))
+print(''.join(hex(int(a[i:i+2],16)^int(b[i:i+2],16))[2:].zfill(2) 
+      for i in range(0,min_len,2)))" > temp.hex
+xxd -p source3.bin | tr -d '\n' | python3 -c "
+import sys
+a=sys.stdin.read()
+b=open('temp.hex').read()
+min_len = min(len(a),len(b))
+print(''.join(hex(int(a[i:i+2],16)^int(b[i:i+2],16))[2:].zfill(2)
+      for i in range(0,min_len,2)))" > final.hex
+
+# Convert back to binary
+xxd -p -r final.hex > hybrid_entropy.bin
+```
+
+---
+
+</details>
 
 ## Quantum Physics Background
 
