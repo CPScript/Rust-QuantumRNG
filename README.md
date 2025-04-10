@@ -1,4 +1,6 @@
-# Quantum Random Number Generator (QRNG)
+# Acknowledge
+
+> This project builds upon theoretical and practical work in the field of quantum random number generation and applies these principles to consumer hardware.
 
 ---
 
@@ -169,7 +171,3 @@ xxd -p audio.bin | tr -d '\n' | python -c "import sys; \
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Acknowledgments
-
-This project builds upon theoretical and practical work in the field of quantum random number generation and applies these principles to consumer hardware.
