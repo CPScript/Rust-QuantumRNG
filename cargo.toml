@@ -1,0 +1,26 @@
+[package]
+name = "QuantumRNG"
+version = "0.1.0"
+edition = "2021"
+authors = ["CPScript"]
+description = "Semi-quantum random number generator using consumer hardware"
+license = "none"
+
+[dependencies]
+opencv = { version = "0.76", features = ["opencv-4"] }
+cpal = "0.14"
+ringbuf = "0.3"
+serialport = "4.2"
+anyhow = "1.0"
+thiserror = "1.0"
+ndarray = "0.15"
+rayon = "1.6"
+sha3 = "0.10"
+rand = "0.8"
+clap = { version = "4.1", features = ["derive"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"
